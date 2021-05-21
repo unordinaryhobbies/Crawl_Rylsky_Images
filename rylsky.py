@@ -25,7 +25,7 @@ class GetRylsky():
             img = ImgLinks[i]
             path = img['alt'].replace(' ','_')
             RawImg = requests.get(img['src'])
-            if os.path.isdir(path) == False:
+            if os.path.isdir(path) is False:
                 os.mkdir(path)
             print("downloading {}: {}th image".format(path, i))
             file = open("{0}/{1}.jpg".format(path , path+str(i)), "wb")
