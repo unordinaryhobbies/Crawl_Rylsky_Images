@@ -74,7 +74,7 @@ class GetRylskyModels():
     def Run(self):
         self.GetModelsHTML()
         print("reading model's html done")
-        # self.GetRedirectURL()
+        self.GetRedirectURL()
         print("Collecting model's picture html files done")
         self.WriteModels()
         i = 0
