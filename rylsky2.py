@@ -1,8 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
 import os
-from time import sleep
-
 class GetRylskyModels():
     def __init__(self, html, model="models.txt"):
         self.GetMainHtml = requests.get(html)
@@ -25,11 +23,13 @@ class GetRylskyModels():
     def ReadModels(self):
         with open(self.modelFile, 'r') as Read:
             for read in Read:
-                self.redirects = read.read()
+                info = Read.readline().split(',')
+                # print("{}\n".format(info))
+                self.redirectHTMLs.append(info)
+        # print(self.redirectHTMLs)
     def WriteModels(self):
-        with open(self.modelFile,'w') as Write:
+        with open(self.modelFile,'a') as Write:
             for redirect in self.redirectHTMLs:
-                print("Write {}".format(redirect))
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
     def GetRedirectURL(self):
         i = 0
@@ -47,12 +47,12 @@ class GetRylskyModels():
                     info = []
                     info.append(modelHTML[0])
                     info.append(a['href'])
-                    # print(info)
                     # print("{}\n\n".format(info))
                     self.redirectHTMLs.append(info)
 
     def GetImageTagsInImageHTML(self, redirectHTML):
         imageLink = []
+        print(redirectHTML)
         html = requests.get(redirectHTML)
         content = BeautifulSoup(html.content, 'lxml')
         ul = content.find('ul', class_='list-gallery a css')
@@ -76,24 +76,23 @@ class GetRylskyModels():
             file.write(RawImg.content)
             file.close()
     def Run(self):
-        self.GetModelsHTML()
-        print("reading model's html done")
-        self.GetRedirectURL()
-        print("Collecting model's picture html files done")
-        self.WriteModels()
-        print("Writing Done")
+        # self.GetModelsHTML()
+        # print("reading model's html done")
+        # self.GetRedirectURL()
+        # print("Collecting model's picture html files done")
+        # self.WriteModels()
+        self.ReadModels()
         i = 0
-        # for redirect in self.redirectHTMLs:
-        #     Tags = self.GetImageTagsInImageHTML(redirect)
-            # name = self.modelName[i]
-            # if os.path.isdir(name) == False:
-            #     os.mkdir(name)
-            # self.GetImg(Tags, name)
-            # i += 1
+        for redirect in self.redirectHTMLs:
+            Tags = self.GetImageTagsInImageHTML(redirect[1])
+            name = redirect[0]
+            if os.path.isdir(name) == False:
+                os.mkdir(name)
+            self.GetImg(Tags, name)
+            i += 1
 
 
 if __name__ == '__main__':
     html = "https://www.elitebabes.com/top-rated-babes/"
     Rylsky = GetRylskyModels(html)
     Rylsky.Run()
-    sleep(10000)
