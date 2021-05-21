@@ -76,7 +76,7 @@ class GetRylskyModels():
             file = open("{0}/{1}/{2}.jpg".format(dir, path , path+str(i)), "wb")
             file.write(RawImg.content)
             file.close()
-      except TypeError:
+      except Exception:
         pass
     def DownloadImages(self,start=0):
       length = len(self.redirectHTMLs)
@@ -88,7 +88,7 @@ class GetRylskyModels():
             if os.path.isdir(name) == False:
                 os.mkdir(name)
             self.GetImg(Tags, name)
-      except TimeoutError:
+      except Exception:
         self.DownloadImages(i)
     def Run(self):
         # self.GetModelsHTML()
