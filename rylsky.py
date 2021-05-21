@@ -46,10 +46,9 @@ class GetRylsky():
             ImgTags = self.GetImageTagsInImageHTML(redirect)
             if ImgTags is None:
                 break;
-            else:
-                # t = Thread(target = self.GetImg, args=(ImgTags))
-                # t.start()
-                self.GetImg(ImgTags)
+            # t = Thread(target = self.GetImg, args=(ImgTags))
+            # t.start()
+            self.GetImg(ImgTags)
 
 if __name__ == '__main__':
     html = "https://www.elitebabes.com/"
