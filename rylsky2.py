@@ -1,42 +1,50 @@
 from bs4 import BeautifulSoup
 import requests
 import os
-from time import sleep
-
 class GetRylskyModels():
-    def __init__(self, html):
+    def __init__(self, html, model="models.txt"):
         self.GetMainHtml = requests.get(html)
         self.mainHTML = BeautifulSoup(self.GetMainHtml.content, 'lxml')
         self.modelHTMLs = []
         self.redirectHTMLs = []
-        self.modelName = []
+        self.modelFile = model
     def GetModelsHTML(self):
         ULs = self.mainHTML.find_all('ul',class_='gallery-a a d')
-
+        info = []
         for ul in ULs:
             As = ul.find_all('a')
-            print("-------------------------------------------------------------")
+            # print("-------------------------------------------------------------")
             for a in As:
                 name = a.find_all('span')[-1].text
-                print(name)
-                self.modelName.append(name)
+                # print(name)
+                info = [name, a['href']]
                 # print("{}\n\n".format(a['href']))
-                self.modelHTMLs.append(a['href'])
-
+                self.modelHTMLs.append(info)
+    def ReadModels(self):
+        with open(self.modelFile, 'r') as Read:
+            for read in Read:
+                self.redirects = read.read()
+    def WriteModels(self):
+        with open(self.modelFile,'w') as Write:
+            for write in self.redirectHTMLs:
+                write.write("{}\n".format("{0},{1}".format(write[0], write[1])))
     def GetRedirectURL(self):
         i = 0
-        for HTML in self.modelHTMLs:
-            print("Reading {}th model's website".format(i))
-            html = requests.get(HTML)
+        info = []
+        for modelHTML in self.modelHTMLs:
+            print("{}, {}\n".format(modelHTML[0], modelHTML[1]))
+            # print("Reading {}th model's website".format(i))
+            html = requests.get(modelHTML[1])
             HTML = BeautifulSoup(html.content, 'lxml')
             ULs = HTML.find_all('ul', class_ = 'gallery-a b')
-            i += 1
-            sleep(2)
             for ul in ULs:
                 As = ul.find_all('a')
                 for a in As:
-                    # print("{}\n\n".format(a['href']))
-                    self.redirectHTMLs.append(a['href'])
+                    info.append(modelHTML[0])
+                    info.append(a['href'])
+                    # print("{}\n\n".format(info))
+                    self.redirectHTMLs.append(info)
+                    info.clear()
 
     def GetImageTagsInImageHTML(self, redirectHTML):
         imageLink = []
@@ -67,6 +75,7 @@ class GetRylskyModels():
         print("reading model's html done")
         self.GetRedirectURL()
         print("Collecting model's picture html files done")
+        self.WriteModels()
         i = 0
         # for redirect in self.redirectHTMLs:
         #     Tags = self.GetImageTagsInImageHTML(redirect)
