@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import os
-
+import time
 class GetRylskyModels():
     def __init__(self, html, model="models.txt"):
         self.GetMainHtml = requests.get(html)
@@ -91,3 +91,4 @@ if __name__ == '__main__':
     html = "https://www.elitebabes.com/top-rated-babes/"
     Rylsky = GetRylskyModels(html)
     Rylsky.Run()
+    time.sleep(300)
