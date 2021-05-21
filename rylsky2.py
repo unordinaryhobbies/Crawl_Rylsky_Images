@@ -53,7 +53,7 @@ class GetRylskyModels():
     def GetImageTagsInImageHTML(self, redirectHTML):
         imageLink = []
         print(redirectHTML)
-        html = requests.get(redirectHTML)
+        html = requests.get(redirectHTML,timeout=5)
         content = BeautifulSoup(html.content, 'lxml')
         ul = content.find('ul', class_='list-gallery a css')
         try:
@@ -65,16 +65,31 @@ class GetRylskyModels():
         return imageLink
 
     def GetImg(self, ImgLinks, dir):
+      try:
         for i in range(len(ImgLinks)):
             img = ImgLinks[i]
             path = img['alt'].replace(' ','_')
-            RawImg = requests.get(img['src'])
+            RawImg = requests.get(img['src'], timeout=5)
             if os.path.isdir("{0}/{1}".format(dir,path)) == False:
                 os.mkdir("{0}/{1}".format(dir,path))
             print("downloading {}: {}th image".format(path, i))
             file = open("{0}/{1}/{2}.jpg".format(dir, path , path+str(i)), "wb")
             file.write(RawImg.content)
             file.close()
+      except TypeError:
+        pass
+    def DownloadImages(self,start=0):
+      length = len(self.redirectHTMLs)
+      try:
+        for i in range(start, length):
+            redirect = self.redirectHTMLs[i]
+            Tags = self.GetImageTagsInImageHTML(redirect[1])
+            name = redirect[0]
+            if os.path.isdir(name) == False:
+                os.mkdir(name)
+            self.GetImg(Tags, name)
+      except TimeoutError:
+        self.DownloadImages(i)
     def Run(self):
         # self.GetModelsHTML()
         # print("reading model's html done")
@@ -82,14 +97,7 @@ class GetRylskyModels():
         # print("Collecting model's picture html files done")
         # self.WriteModels()
         self.ReadModels()
-        i = 0
-        for redirect in self.redirectHTMLs:
-            Tags = self.GetImageTagsInImageHTML(redirect[1])
-            name = redirect[0]
-            if os.path.isdir(name) == False:
-                os.mkdir(name)
-            self.GetImg(Tags, name)
-            i += 1
+        self.DownloadImages()
 
 
 if __name__ == '__main__':
