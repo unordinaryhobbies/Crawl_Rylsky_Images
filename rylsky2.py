@@ -70,7 +70,7 @@ class GetRylskyModels():
             img = ImgLinks[i]
             path = img['alt'].replace(' ','_')
             RawImg = requests.get(img['src'], timeout=5)
-            if os.path.isdir("{0}/{1}".format(dir,path)) == False:
+            if os.path.isdir("{0}/{1}".format(dir,path)) is False:
                 os.mkdir("{0}/{1}".format(dir,path))
             print("downloading {}: {}th image".format(path, i))
             file = open("{0}/{1}/{2}.jpg".format(dir, path , path+str(i)), "wb")
@@ -85,7 +85,7 @@ class GetRylskyModels():
             redirect = self.redirectHTMLs[i]
             Tags = self.GetImageTagsInImageHTML(redirect[1])
             name = redirect[0]
-            if os.path.isdir(name) == False:
+            if os.path.isdir(name) is False:
                 os.mkdir(name)
             self.GetImg(Tags, name)
       except Exception:
