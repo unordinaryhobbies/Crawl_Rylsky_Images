@@ -1,7 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 import os
-import time
+from time import sleep
+
 class GetRylskyModels():
     def __init__(self, html, model="models.txt"):
         self.GetMainHtml = requests.get(html)
@@ -31,7 +32,6 @@ class GetRylskyModels():
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
     def GetRedirectURL(self):
         i = 0
-        info = []
         for modelHTML in self.modelHTMLs:
             print("{}, {}\n".format(modelHTML[0], modelHTML[1]))
             # print("Reading {}th model's website".format(i))
@@ -40,12 +40,14 @@ class GetRylskyModels():
             ULs = HTML.find_all('ul', class_ = 'gallery-a b')
             for ul in ULs:
                 As = ul.find_all('a')
+                # print(self.redirectHTMLs)
+                # sleep(10)
                 for a in As:
+                    info = []
                     info.append(modelHTML[0])
                     info.append(a['href'])
                     # print("{}\n\n".format(info))
                     self.redirectHTMLs.append(info)
-                    info.clear()
 
     def GetImageTagsInImageHTML(self, redirectHTML):
         imageLink = []
@@ -91,4 +93,4 @@ if __name__ == '__main__':
     html = "https://www.elitebabes.com/top-rated-babes/"
     Rylsky = GetRylskyModels(html)
     Rylsky.Run()
-    time.sleep(300)
+    sleep(10000)
