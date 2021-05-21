@@ -27,8 +27,9 @@ class GetRylskyModels():
             for read in Read:
                 self.redirects = read.read()
     def WriteModels(self):
-        with open(self.modelFile,'a') as Write:
+        with open(self.modelFile,'w') as Write:
             for redirect in self.redirectHTMLs:
+                print("Write {}".format(redirect))
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
     def GetRedirectURL(self):
         i = 0
@@ -46,6 +47,7 @@ class GetRylskyModels():
                     info = []
                     info.append(modelHTML[0])
                     info.append(a['href'])
+                    # print(info)
                     # print("{}\n\n".format(info))
                     self.redirectHTMLs.append(info)
 
