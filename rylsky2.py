@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import os
+
 class GetRylskyModels():
     def __init__(self, html, model="models.txt"):
         self.GetMainHtml = requests.get(html)
@@ -25,9 +26,9 @@ class GetRylskyModels():
             for read in Read:
                 self.redirects = read.read()
     def WriteModels(self):
-        with open(self.modelFile,'w') as Write:
-            for write in self.redirectHTMLs:
-                write.write("{}\n".format("{0},{1}".format(write[0], write[1])))
+        with open(self.modelFile,'a') as Write:
+            for redirect in self.redirectHTMLs:
+                Write.write("{},{}\n".format(redirect[0], redirect[1]))
     def GetRedirectURL(self):
         i = 0
         info = []
@@ -73,7 +74,7 @@ class GetRylskyModels():
     def Run(self):
         self.GetModelsHTML()
         print("reading model's html done")
-        self.GetRedirectURL()
+        # self.GetRedirectURL()
         print("Collecting model's picture html files done")
         self.WriteModels()
         i = 0
