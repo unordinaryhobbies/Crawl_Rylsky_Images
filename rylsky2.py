@@ -79,6 +79,7 @@ class GetRylskyModels():
         self.GetRedirectURL()
         print("Collecting model's picture html files done")
         self.WriteModels()
+        print("Writing Done")
         i = 0
         # for redirect in self.redirectHTMLs:
         #     Tags = self.GetImageTagsInImageHTML(redirect)
