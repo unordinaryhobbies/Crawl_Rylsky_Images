@@ -1,2 +1,2 @@
 # Crawl
-Program that scrap photos of nude art
+Program that scrap photos of nude art from rylsky
