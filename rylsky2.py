@@ -98,9 +98,3 @@ class GetRylskyModels():
         # self.WriteModels()
         self.ReadModels()
         self.DownloadImages()
-
-
-if __name__ == '__main__':
-    html = "https://www.elitebabes.com/top-rated-babes/"
-    Rylsky = GetRylskyModels(html)
-    Rylsky.Run()
