@@ -25,7 +25,7 @@ class GetRylsky():
             img = ImgLinks[i]
             path = img['alt'].replace(' ','_')
             RawImg = requests.get(img['src'])
-            if os.path.isdir(path) == False:
+            if os.path.isdir(path) is False:
                 os.mkdir(path)
             print("downloading {}: {}th image".format(path, i))
             file = open("{0}/{1}.jpg".format(path , path+str(i)), "wb")
@@ -46,10 +46,9 @@ class GetRylsky():
             ImgTags = self.GetImageTagsInImageHTML(redirect)
             if ImgTags is None:
                 break;
-            else:
-                # t = Thread(target = self.GetImg, args=(ImgTags))
-                # t.start()
-                self.GetImg(ImgTags)
+            # t = Thread(target = self.GetImg, args=(ImgTags))
+            # t.start()
+            self.GetImg(ImgTags)
 
 if __name__ == '__main__':
     html = "https://www.elitebabes.com/"
