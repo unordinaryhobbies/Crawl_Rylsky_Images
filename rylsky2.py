@@ -32,7 +32,6 @@ class GetRylskyModels():
             for redirect in self.redirectHTMLs:
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
     def GetRedirectURL(self):
-        i = 0
         for modelHTML in self.modelHTMLs:
             print("{}, {}\n".format(modelHTML[0], modelHTML[1]))
             # print("Reading {}th model's website".format(i))
@@ -52,7 +51,6 @@ class GetRylskyModels():
 
     def GetImageTagsInImageHTML(self, redirectHTML):
         imageLink = []
-        print(redirectHTML)
         html = requests.get(redirectHTML,timeout=5)
         content = BeautifulSoup(html.content, 'lxml')
         ul = content.find('ul', class_='list-gallery a css')
@@ -70,10 +68,10 @@ class GetRylskyModels():
             img = ImgLinks[i]
             path = img['alt'].replace(' ','_')
             RawImg = requests.get(img['src'], timeout=5)
-            if os.path.isdir("{0}/{1}".format(dir,path)) is False:
-                os.mkdir("{0}/{1}".format(dir,path))
+            if os.path.isdir("{0}/{1}/{2}".format('pic',dir,path)) is False:
+                os.mkdir("{0}/{1}/{2}".format('pic',dir,path))
             print("downloading {}: {}th image".format(path, i))
-            file = open("{0}/{1}/{2}.jpg".format(dir, path , path+str(i)), "wb")
+            file = open("{0}/{1}/{2}/{3}.jpg".format('pic',dir, path , path+str(i)), "wb")
             file.write(RawImg.content)
             file.close()
       except Exception:
@@ -82,27 +80,31 @@ class GetRylskyModels():
       length = len(self.redirectHTMLs)
       try:
         for i in range(start, length):
+            print("Recording {}th out of {}\n{}%\n\n".format(i,length,(i/length *100)))
             redirect = self.redirectHTMLs[i]
             Tags = self.GetImageTagsInImageHTML(redirect[1])
             name = redirect[0]
-            if os.path.isdir(name) == False:
-                os.mkdir(name)
+            if os.path.isdir("pic/{}".format(name)) == False:
+                os.mkdir("pic/{}".format(name))
             self.GetImg(Tags, name)
-            self.ReadLastSection()
+            self.RecordLastSection(str(i))
       except Exception:
         self.DownloadImages(i)
     @staticmethod
     def RecordLastSection(lastsection):
-      with open("lastsection.txt",'w') as w:
-        w.write(lastsection)
+      file = open('lastsection.txt','w')
+      file.write(lastsection)
+      file.close()
     @staticmethod
     def ReadLastSection():
       try:
         with open("lastsection.txt",'r') as r:
-          last = r.read()
+          last = r.readline()
           last = int(last)
         return last
       except FileNotFoundError:
+        return
+      except ValueError:
         return
     def Run(self):
         # self.GetModelsHTML()
@@ -111,6 +113,8 @@ class GetRylskyModels():
         # print("Collecting model's picture html files done")
         # self.WriteModels()
         self.ReadModels()
+        if os.path.isdir('pic') == False:
+            os.mkdir('pic')
         lastRead =self.ReadLastSection()
         if lastRead != None:
           self.DownloadImages(lastRead)
