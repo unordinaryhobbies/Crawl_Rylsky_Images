@@ -88,8 +88,22 @@ class GetRylskyModels():
             if os.path.isdir(name) == False:
                 os.mkdir(name)
             self.GetImg(Tags, name)
+            self.ReadLastSection()
       except Exception:
         self.DownloadImages(i)
+    @staticmethod
+    def RecordLastSection(lastsection):
+      with open("lastsection.txt",'w') as w:
+        w.write(lastsection)
+    @staticmethod
+    def ReadLastSection():
+      try:
+        with open("lastsection.txt",'r') as r:
+          last = r.read()
+          last = int(last)
+        return last
+      except FileNotFoundError:
+        return
     def Run(self):
         # self.GetModelsHTML()
         # print("reading model's html done")
@@ -97,4 +111,13 @@ class GetRylskyModels():
         # print("Collecting model's picture html files done")
         # self.WriteModels()
         self.ReadModels()
-        self.DownloadImages()
+        lastRead =self.ReadLastSection()
+        if lastRead != None:
+          self.DownloadImages(lastRead)
+        else:
+          self.DownloadImages()
+
+if __name__ == '__main__':
+    html = "https://www.elitebabes.com/top-rated-babes/"
+    Rylsky = GetRylskyModels(html)
+    Rylsky.Run()
