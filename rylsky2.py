@@ -16,7 +16,6 @@ class GetRylskyModels():
         info = []
         for ul in ULs:
             As = ul.find_all('a')
-            # print("-------------------------------------------------------------")
             for a in As:
                 name = a.find_all('span')[-1].text
                 # print(name)
@@ -34,7 +33,7 @@ class GetRylskyModels():
         with open(self.modelFile,'a') as Write:
             for redirect in self.redirectHTMLs:
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
-    def GetRedirectURL(self):
+    def __GetRedirectURL(self):
         for modelHTML in self.modelHTMLs:
             print("{}, {}\n".format(modelHTML[0], modelHTML[1]))
             # print("Reading {}th model's website".format(i))
@@ -106,6 +105,7 @@ class GetRylskyModels():
             self.__DownloadImage(i)
       except Exception:
         self.__DownloadImages(i)
+
     def __DownloadImage(self, index):
           redirect = self.redirectHTMLs[index]
           Tags = self.GetImageTagsInImageHTML(redirect[1])
@@ -140,22 +140,25 @@ class GetRylskyModels():
         return
       except ValueError:
         return
-    def Run(self):
-        # self.__GetModelsHTML()
-        # print("reading model's html done")
-        # self.GetRedirectURL()
-        # print("Collecting model's picture html files done")
-        # self.__WriteModels()
+
+    def GetAllImages(self):
         self.__ReadModels()
         if os.path.isdir('pic') == False:
             os.mkdir('pic')
-        lastRead =self.__ReadLastSection()
+        lastRead = self.__ReadLastSection()
         if lastRead != None:
           self.__DownloadImages(lastRead)
         else:
           self.__DownloadImages()
 
+    def ProcessLinksBeforeDownload(self):
+        self.__GetModelsHTML()
+        print("reading model's html done")
+        self.__GetRedirectURL()
+        print("Collecting model's picture html files done")
+        self.__WriteModels()
+
 if __name__ == '__main__':
     html = "https://www.elitebabes.com/top-rated-babes/"
     Rylsky = GetRylskyModels(html)
-    Rylsky.Run()
+    Rylsky.GetAllImages()
