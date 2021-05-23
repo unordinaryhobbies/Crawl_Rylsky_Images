@@ -1,8 +1,10 @@
+from concurrent.futures import thread
 from bs4 import BeautifulSoup
 import requests
 import os
-import asyncio
 import pdb
+import concurrent.futures as cf
+import time
 
 class GetRylskyModels():
     def __init__(self, html, model="models.txt"):
@@ -82,7 +84,7 @@ class GetRylskyModels():
             if os.path.isdir("{0}/{1}/{2}".format('pic',dir,path)) is False:
                 os.mkdir("{0}/{1}/{2}".format('pic',dir,path))
 
-            print("downloading {}: {}th image".format(path, i))
+            print("Downloading {:>90}: {:>15}th image".format(path, i))
 
             self.__WriteImage(path="{0}/{1}/{2}/{3}.jpg".format('pic',dir, path , path+str(i)), RawImage=RawImg)
       except Exception:
@@ -97,13 +99,19 @@ class GetRylskyModels():
 
     def __DownloadImages(self,start=0):
       length = len(self.redirectHTMLs)
+      i = 0
       try:
-        for i in range(start, length, 4):
-            print("Recording {}th out of {}\n{}%\n\n".format(i,length,(i/length *100)))
-            self.__DownloadImage(i)
+        #Call multi thread to process faster
+        with cf.ThreadPoolExecutor(max_workers=8) as worker:
+          for i in range(start, length):
+              worker.submit(self.__DownloadImage, i)
+
+      except KeyboardInterrupt:
+        exit()
+
       except Exception:
         self.__DownloadImages(i)
-
+                      
     def __DownloadImage(self, index):
           redirect = self.redirectHTMLs[index]
           Tags = self.GetImageTagsInImageHTML(redirect[1])
@@ -119,7 +127,9 @@ class GetRylskyModels():
           self.__GetImage(Tags, name)
 
           #Record the last section so that if the network fails, it will remember it's last reading
-          self.__RecordLastSection(str(index))
+          #Potential problem collision with recording
+          # self.__RecordLastSection(str(index))
+
     #Record lsat section of writing image
     @staticmethod
     def __RecordLastSection(lastsection):
@@ -138,8 +148,15 @@ class GetRylskyModels():
         return
       except ValueError:
         return
-
+    def Timer(startedTime):
+          time_elapsed = time.time() - startedTime
+          
+          hour, min_sec = divmod(time_elapsed, 3600)
+          min, sec = divmod(min_sec, 60)
+          print("{:>3} hour {:>3} minute {:>3} second".format(int(hour), int(min), int(sec)))
+          
     def GetAllImages(self):
+          start = time.time()
           try:
             self.__ReadModels()
             if os.path.isdir('pic') == False:
@@ -149,6 +166,10 @@ class GetRylskyModels():
               self.__DownloadImages(lastRead)
             else:
               self.__DownloadImages()
+
+            #Print time elapsed
+            self.Timer(start)
+            
           except KeyboardInterrupt:
             pass
 
