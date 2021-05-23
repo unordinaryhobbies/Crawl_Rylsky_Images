@@ -1,6 +1,9 @@
 from bs4 import BeautifulSoup
 import requests
 import os
+import asyncio
+import pdb
+
 class GetRylskyModels():
     def __init__(self, html, model="models.txt"):
         self.GetMainHtml = requests.get(html)
@@ -8,7 +11,7 @@ class GetRylskyModels():
         self.modelHTMLs = []
         self.redirectHTMLs = []
         self.modelFile = model
-    def GetModelsHTML(self):
+    def __GetModelsHTML(self):
         ULs = self.mainHTML.find_all('ul',class_='gallery-a a d')
         info = []
         for ul in ULs:
@@ -20,14 +23,14 @@ class GetRylskyModels():
                 info = [name, a['href']]
                 # print("{}\n\n".format(a['href']))
                 self.modelHTMLs.append(info)
-    def ReadModels(self):
+    def __ReadModels(self):
         with open(self.modelFile, 'r') as Read:
             for read in Read:
                 info = Read.readline().split(',')
                 # print("{}\n".format(info))
                 self.redirectHTMLs.append(info)
         # print(self.redirectHTMLs)
-    def WriteModels(self):
+    def __WriteModels(self):
         with open(self.modelFile,'a') as Write:
             for redirect in self.redirectHTMLs:
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
@@ -48,55 +51,86 @@ class GetRylskyModels():
                     info.append(a['href'])
                     # print("{}\n\n".format(info))
                     self.redirectHTMLs.append(info)
-
-    def GetImageTagsInImageHTML(self, redirectHTML):
+    @staticmethod
+    def GetImageTagsInImageHTML(redirectHTML):
         imageLink = []
+        
+        #Calling Model's Collection Album html
         html = requests.get(redirectHTML,timeout=5)
         content = BeautifulSoup(html.content, 'lxml')
+
         ul = content.find('ul', class_='list-gallery a css')
         try:
+            #Find all image tags
             imageTags = ul.find_all('img')
         except Exception:
             return
+        #Append all the images and return
         for tag in imageTags:
             imageLink.append(tag)
         return imageLink
-
-    def GetImg(self, ImgLinks, dir):
+    def __GetImage(self, ImgLinks, dir):
       try:
         for i in range(len(ImgLinks)):
+            #Image tag from html file
             img = ImgLinks[i]
+
+            #Replace blank space in title with '_'
             path = img['alt'].replace(' ','_')
+
+            #Get the image file link
             RawImg = requests.get(img['src'], timeout=5)
+
+            #Check if dir exist before copying image to the directory
             if os.path.isdir("{0}/{1}/{2}".format('pic',dir,path)) is False:
                 os.mkdir("{0}/{1}/{2}".format('pic',dir,path))
+
             print("downloading {}: {}th image".format(path, i))
-            file = open("{0}/{1}/{2}/{3}.jpg".format('pic',dir, path , path+str(i)), "wb")
-            file.write(RawImg.content)
-            file.close()
+
+            self.__WriteImage(path="{0}/{1}/{2}/{3}.jpg".format('pic',dir, path , path+str(i)), RawImage=RawImg)
       except Exception:
         pass
-    def DownloadImages(self,start=0):
+    
+    #Write data to the image.
+    @staticmethod
+    def __WriteImage(path, RawImage):
+          file = open(path, "wb")
+          file.write(RawImage.content)
+          file.close()
+
+    def __DownloadImages(self,start=0):
       length = len(self.redirectHTMLs)
       try:
         for i in range(start, length):
-            print("Recording {}th out of {}\n{}%\n\n".format(i,length,(i/length *100)))
+            # print("Recording {}th out of {}\n{}%\n\n".format(i,length,(i/length *100)))
             redirect = self.redirectHTMLs[i]
             Tags = self.GetImageTagsInImageHTML(redirect[1])
+
+            #Model's name
             name = redirect[0]
+
+            #Check if dir exist before writing getting model's pic
             if os.path.isdir("pic/{}".format(name)) == False:
                 os.mkdir("pic/{}".format(name))
-            self.GetImg(Tags, name)
-            self.RecordLastSection(str(i))
+
+            #Call images from the website
+            self.__GetImage(Tags, name)
+
+            #Record the last section so that if the network fails, it will remember it's last reading
+            self.__RecordLastSection(str(i))
       except Exception:
-        self.DownloadImages(i)
+        self.__DownloadImages(i)
+
+    #Record lsat section of writing image
     @staticmethod
-    def RecordLastSection(lastsection):
+    def __RecordLastSection(lastsection):
       file = open('lastsection.txt','w')
       file.write(lastsection)
       file.close()
+
+    #Read last section of writing image
     @staticmethod
-    def ReadLastSection():
+    def __ReadLastSection():
       try:
         with open("lastsection.txt",'r') as r:
           last = r.readline()
@@ -107,19 +141,19 @@ class GetRylskyModels():
       except ValueError:
         return
     def Run(self):
-        # self.GetModelsHTML()
+        # self.__GetModelsHTML()
         # print("reading model's html done")
         # self.GetRedirectURL()
         # print("Collecting model's picture html files done")
-        # self.WriteModels()
-        self.ReadModels()
+        # self.__WriteModels()
+        self.__ReadModels()
         if os.path.isdir('pic') == False:
             os.mkdir('pic')
-        lastRead =self.ReadLastSection()
+        lastRead =self.__ReadLastSection()
         if lastRead != None:
-          self.DownloadImages(lastRead)
+          self.__DownloadImages(lastRead)
         else:
-          self.DownloadImages()
+          self.__DownloadImages()
 
 if __name__ == '__main__':
     html = "https://www.elitebabes.com/top-rated-babes/"
