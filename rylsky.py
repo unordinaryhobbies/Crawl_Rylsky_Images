@@ -120,7 +120,7 @@ class GetRylskyModels():
           name = redirect[0]
 
           #Check if dir exist before writing getting model's pic
-          if os.path.isdir("pic/{}".format(name)) == False:
+          if os.path.isdir("pic/{}".format(name)) is False:
                 os.mkdir("pic/{}".format(name))
 
           #Call images from the website
@@ -159,10 +159,10 @@ class GetRylskyModels():
           start = time.time()
           try:
             self.__ReadModels()
-            if os.path.isdir('pic') == False:
+            if os.path.isdir('pic') is False:
                 os.mkdir('pic')
             lastRead = self.__ReadLastSection()
-            if lastRead != None:
+            if lastRead is not None:
               self.__DownloadImages(lastRead)
             else:
               self.__DownloadImages()
