@@ -101,33 +101,33 @@ class GetRylskyModels():
     def __DownloadImages(self,start=0):
       length = len(self.redirectHTMLs)
       try:
-        for i in range(start, length):
-            # print("Recording {}th out of {}\n{}%\n\n".format(i,length,(i/length *100)))
-            redirect = self.redirectHTMLs[i]
-            Tags = self.GetImageTagsInImageHTML(redirect[1])
-
-            #Model's name
-            name = redirect[0]
-
-            #Check if dir exist before writing getting model's pic
-            if os.path.isdir("pic/{}".format(name)) == False:
-                os.mkdir("pic/{}".format(name))
-
-            #Call images from the website
-            self.__GetImage(Tags, name)
-
-            #Record the last section so that if the network fails, it will remember it's last reading
-            self.__RecordLastSection(str(i))
+        for i in range(start, length, 4):
+            print("Recording {}th out of {}\n{}%\n\n".format(i,length,(i/length *100)))
+            self.__DownloadImage(i)
       except Exception:
         self.__DownloadImages(i)
+    def __DownloadImage(self, index):
+          redirect = self.redirectHTMLs[index]
+          Tags = self.GetImageTagsInImageHTML(redirect[1])
 
+          #Model's name
+          name = redirect[0]
+
+          #Check if dir exist before writing getting model's pic
+          if os.path.isdir("pic/{}".format(name)) == False:
+                os.mkdir("pic/{}".format(name))
+
+          #Call images from the website
+          self.__GetImage(Tags, name)
+
+          #Record the last section so that if the network fails, it will remember it's last reading
+          self.__RecordLastSection(str(index))
     #Record lsat section of writing image
     @staticmethod
     def __RecordLastSection(lastsection):
       file = open('lastsection.txt','w')
       file.write(lastsection)
       file.close()
-
     #Read last section of writing image
     @staticmethod
     def __ReadLastSection():
