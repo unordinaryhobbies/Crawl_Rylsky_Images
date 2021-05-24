@@ -53,7 +53,7 @@ class GetRylskyModels():
                     # print("{}\n\n".format(info))
                     self.redirectHTMLs.append(info)
     @staticmethod
-    def GetImageTagsInImageHTML(redirectHTML):
+    def __GetImageTagsInImageHTML(redirectHTML):
         imageLink = []
         
         #Calling Model's Collection Album html
@@ -102,7 +102,7 @@ class GetRylskyModels():
       i = 0
       try:
         #Call multi thread to process faster
-        with cf.ThreadPoolExecutor(max_workers=8) as worker:
+        with cf.ThreadPoolExecutor() as worker:
           for i in range(start, length):
               worker.submit(self.__DownloadImage, i)
 
@@ -114,7 +114,7 @@ class GetRylskyModels():
                       
     def __DownloadImage(self, index):
           redirect = self.redirectHTMLs[index]
-          Tags = self.GetImageTagsInImageHTML(redirect[1])
+          Tags = self.__GetImageTagsInImageHTML(redirect[1])
 
           #Model's name
           name = redirect[0]
