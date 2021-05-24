@@ -148,6 +148,7 @@ class GetRylskyModels():
         return
       except ValueError:
         return
+    @staticmethod
     def Timer(startedTime):
           time_elapsed = time.time() - startedTime
           
