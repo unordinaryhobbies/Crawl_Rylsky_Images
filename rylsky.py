@@ -4,6 +4,7 @@ import requests
 import os
 import pdb
 import concurrent.futures as cf
+import sys
 import time
 from typing import List, Union
 
@@ -108,7 +109,7 @@ class GetRylskyModels():
               worker.submit(self.__DownloadImage, i)
 
       except KeyboardInterrupt:
-        exit()
+        sys.exit()
 
       except Exception:
         self.__DownloadImages(i)
