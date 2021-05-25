@@ -5,13 +5,14 @@ import os
 import pdb
 import concurrent.futures as cf
 import time
+from typing import List, Union
 
 class GetRylskyModels():
-    def __init__(self, html, model="models.txt"):
+    def __init__(self, html: str, model="models.txt"):
         self.GetMainHtml = requests.get(html)
         self.mainHTML = BeautifulSoup(self.GetMainHtml.content, 'lxml')
-        self.modelHTMLs = []
-        self.redirectHTMLs = []
+        self.modelHTMLs: List[str] = []
+        self.redirectHTMLs: List[str] = []
         self.modelFile = model
     def __GetModelsHTML(self):
         ULs = self.mainHTML.find_all('ul',class_='gallery-a a d')
@@ -53,7 +54,7 @@ class GetRylskyModels():
                     # print("{}\n\n".format(info))
                     self.redirectHTMLs.append(info)
     @staticmethod
-    def __GetImageTagsInImageHTML(redirectHTML):
+    def __GetImageTagsInImageHTML(redirectHTML: str) -> Union[List[str], None]:
         imageLink = []
         
         #Calling Model's Collection Album html
@@ -65,12 +66,12 @@ class GetRylskyModels():
             #Find all image tags
             imageTags = ul.find_all('img')
         except Exception:
-            return
+            return None
         #Append all the images and return
         for tag in imageTags:
             imageLink.append(tag)
         return imageLink
-    def __GetImage(self, ImgLinks, dir):
+    def __GetImage(self, ImgLinks, dir: str) -> None:
       try:
         for i , img in enumerate(ImgLinks):
               
@@ -92,7 +93,7 @@ class GetRylskyModels():
     
     #Write data to the image.
     @staticmethod
-    def __WriteImage(path, RawImage):
+    def __WriteImage(path: str, RawImage):
           file = open(path, "wb")
           file.write(RawImage.content)
           file.close()
@@ -112,7 +113,7 @@ class GetRylskyModels():
       except Exception:
         self.__DownloadImages(i)
                       
-    def __DownloadImage(self, index):
+    def __DownloadImage(self, index: int):
           redirect = self.redirectHTMLs[index]
           Tags = self.__GetImageTagsInImageHTML(redirect[1])
 
@@ -132,22 +133,23 @@ class GetRylskyModels():
 
     #Record lsat section of writing image
     @staticmethod
-    def __RecordLastSection(lastsection):
+    def __RecordLastSection(lastsection: str):
       file = open('lastsection.txt','w')
       file.write(lastsection)
       file.close()
     #Read last section of writing image
     @staticmethod
-    def __ReadLastSection():
+    def __ReadLastSection() -> Union[int, None]:
       try:
         with open("lastsection.txt",'r') as r:
-          last = r.readline()
-          last = int(last)
+          last: int = int(r.readline())
+
+        #If value found, return the last recorded value
         return last
+
       except FileNotFoundError:
-        return
-      except ValueError:
-        return
+        return None
+
     @staticmethod
     def Timer(startedTime):
           time_elapsed = time.time() - startedTime
