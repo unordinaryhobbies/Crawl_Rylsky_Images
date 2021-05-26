@@ -218,9 +218,9 @@ class GetRylskyModels():
     def Timer(startedTime):
           time_elapsed = time.time() - startedTime
           
-          hour, min_sec = divmod(time_elapsed, 3600)
-          min, sec = divmod(min_sec, 60)
-          print("{:>3} hour {:>3} minute {:>3} second".format(int(hour), int(min), int(sec)))
+          hours, min_sec = divmod(time_elapsed, 3600)
+          minutes, seconds = divmod(min_sec, 60)
+          print("{:>3} hour {:>3} minute {:>3} second".format(int(hours), int(minutes), int(seconds)))
 
     def DownloadAllImages(self):
           start = time.time()
