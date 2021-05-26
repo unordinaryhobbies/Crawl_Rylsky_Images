@@ -37,7 +37,6 @@ import concurrent.futures as cf
 import sys
 import time
 from typing import List, Union
-import sys
 
 class GetRylskyModels():
     def __init__(self, ModelProfileLinkDatabase="ModelAlbumLinks.txt"):
