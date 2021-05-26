@@ -134,7 +134,7 @@ class GetRylskyModels():
             AlbumImgTags.append(ModelAlbumImageTag)
         return AlbumImgTags
 
-    def __GetImage(self, ImgLinks, dir: str):
+    def __GetImage(self, ImgLinks, directory: str):
       try:
         for i , img in enumerate(ImgLinks):
               
@@ -145,12 +145,12 @@ class GetRylskyModels():
             RawImg = requests.get(img['src'], timeout=5)
 
             #Check if dir exist before copying image to the directory
-            if os.path.isdir("{0}/{1}/{2}".format('RylskyTopModels',dir,path)) is False:
-                os.mkdir("{0}/{1}/{2}".format('RylskyTopModels',dir,path))
+            if os.path.isdir("{0}/{1}/{2}".format('RylskyTopModels',directory,path)) is False:
+                os.mkdir("{0}/{1}/{2}".format('RylskyTopModels',directory,path))
 
             print("Downloading {:>90}: {:>15}th image".format(path, i))
 
-            self.__WriteImage(path="{0}/{1}/{2}/{3}.jpg".format('RylskyTopModels',dir, path , path+str(i)), RawImage=RawImg)
+            self.__WriteImage(path="{0}/{1}/{2}/{3}.jpg".format('RylskyTopModels',directory, path , path+str(i)), RawImage=RawImg)
       except Exception:
         pass
     
