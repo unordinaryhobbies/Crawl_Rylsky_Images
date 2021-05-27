@@ -11,7 +11,7 @@
 #How to Run?
 ##########################################
 #1.Initialise Constructor
-#2.Run Rylsky.ProcessLinksBeforeDownload() to get all the model's album links
+#2.Run Rylsky.ProcessLinksBeforeDownload() to get all the model's album links. (This process take approximately 17 - 21 minutes)
 #3.After getting all the model album links, Run Rylsky.DownloadAllImages() to download all images
 
 #How it produces a folder
@@ -23,12 +23,13 @@
 
 #Information about rylsky hot models page
 ##########################################
+#In total the page has 90000+ links
+#There are approximately 100+ pages in rylsky top models
 #There are 89 model profiles in rylsky top model page 1
-#One Model Profile contains approximately 10-50 albums
+#One Model Profile contains approximately 10-100 albums
 #One Model Album contains approximately 10-20 pictures
 #In total, it downloads approximately 50 thousand pictures
 
-from concurrent.futures import thread
 from bs4 import BeautifulSoup
 import requests
 import os
@@ -36,46 +37,75 @@ import pdb
 import concurrent.futures as cf
 import sys
 import time
-from typing import List, Union
+from typing import List, Union, Callable
 
 class GetRylskyModels():
     def __init__(self, ModelProfileLinkDatabase="ModelAlbumLinks.txt"):
-        self.RylskyHotModelPage = "https://www.elitebabes.com/top-rated-babes/"
+        self.RylskyHotModelMainPage = "https://www.elitebabes.com/top-rated-babes/"
         self.__ModelProfileLinks: List[str] = []
         self.ModelNameAndAlbumLinks: List[str] = []
         self.__ModelProfileLinkDatabase = ModelProfileLinkDatabase
+        self.__HotModelPages: List[str] = ["https://www.elitebabes.com/top-rated-babes/"]
+    
+    def __GetHotModelPages(self, NextPage: str, MaxPageLimit = 50):
+        
+        #If it reached more than the max limit, exit
+        if str(MaxPageLimit) in NextPage:
+              return None
 
-    #Call main html and convert to BS4 type
-    def __GetHotModelPage(self):
-        #Get the main html
-        RylskyMainHTML = requests.get(self.RylskyHotModelPage)
+        #Get next page
+        HotModelPage = requests.get(NextPage)
+        HotModelPage = BeautifulSoup(HotModelPage.content, 'lxml')
 
-        #When main html is received process it with bs4
-        self.__RylskyMainHTML: str = BeautifulSoup(RylskyMainHTML.content, 'lxml')
+        Nav_HotModelPage = HotModelPage.find('nav', class_='pagination-a')
+
+        Li_NextPage = Nav_HotModelPage.find('li', class_='next')
+        
+        #Repeat until there are no next pages
+        if Li_NextPage is not None:
+          NextHotModelPageLink = Li_NextPage.find('a')['href']
+          print("Found : {}".format(NextHotModelPageLink))
+
+          self.__HotModelPages.append(NextHotModelPageLink)
+
+          return self.__GetHotModelPages(NextHotModelPageLink)
+        
+        return None
 
     #Get model's profile links to get model's album links
     def __GetModelProfileLinks(self):
-        #Call unordered list that stores the model's profile
-        ULs = self.__RylskyMainHTML.find_all('ul', class_='gallery-a a d')
+          
+        for HotModelPage in self.__HotModelPages:
+          #Get Request From Each Page
+          HotModelPage = requests.get(HotModelPage)
+          HotModelPage = BeautifulSoup(HotModelPage.content, 'lxml')
+          #Call unordered list that stores the model's profile
+          ULs = HotModelPage.find_all('ul', class_='gallery-a a d')
 
-        #
-        ModelProfileLink = []
+          ModelProfileLink = []
 
-        #Store model's name and profile link in list
-        for ul in ULs:
+          #Store model's name and profile link in list
+          for ul in ULs:
             #Find model's link by finding a href link
             As = ul.find_all('a')
 
-            for a in As:
-                #Get the <span> which contains the name of the model
-                name = a.find_all('span')[-1].text
-                print("Target: Model name found! : {}".format(name))
+            with cf.ThreadPoolExecutor() as worker:
+              for a in As:
+                  #Get the <span> which contains the name of the model
+                  name = a.find_all('span')[-1].text
+                  print("\nTarget: Model name found! : {}".format(name))
 
-                ModelProfileLink = [name, a['href']]
+                  ModelProfileLink = [name, a['href']]
+                  worker.submit(self.FindAdditionalModelProfileLinks, ModelProfileLink)
 
-                self.__ModelProfileLinks.append(ModelProfileLink)
+    def FindAdditionalModelProfileLinks(self, ModelProfileLink):
+        self.__ModelProfileLinks.append(ModelProfileLink)
+
+        #Check if model profile's additional pages exist and append them
+        self.__CheckAdditionalPagesInModelProfileExist(ModelProfileLink)
     
     def __ReadModelProfileLinkDB(self):
+        self.ModelNameAndAlbumLinks = []
         with open(self.__ModelProfileLinkDatabase, 'r') as Read:
             for read in Read:
                 info = Read.readline().split(',')
@@ -83,34 +113,64 @@ class GetRylskyModels():
                 self.ModelNameAndAlbumLinks.append(info)
 
     def __WriteModelProfileLinkDB(self):
+        self.__ModelProfileLinks.sort(key=lambda ModelProfileLink: ModelProfileLink[0],reverse=True)
         with open(self.__ModelProfileLinkDatabase,'a') as Write:
             for redirect in self.ModelNameAndAlbumLinks:
                 Write.write("{},{}\n".format(redirect[0], redirect[1]))
 
+    def __CheckAdditionalPagesInModelProfileExist(self, ModelProfileLink):
+          Name, ProfileLink = ModelProfileLink
+
+          #Get model's profile's HTML
+          ModelProfile = requests.get(ProfileLink)
+          ModelProfile = BeautifulSoup(ModelProfile.content, "lxml")
+          
+          #Find if additional pages exist
+          AdditionalPages = ModelProfile.find("div", class_="m-pagination")
+
+          #If there are no additional pages, exit
+          if AdditionalPages is None:
+                print("No additional pages found")
+                return
+          #Otherwise, find "a" element
+          AdditionalPagesSource = AdditionalPages.find_all('a')
+
+          for ModelProfileLink in AdditionalPagesSource:
+                #Check if the link is relevent to models
+                if ModelProfileLink['href'].startswith('https://www.elitebabes.com/model') and 'mpage' in ModelProfileLink['href']:
+                  ModelProfile = [Name, ModelProfileLink['href']]
+                  print("Model Profile links Found!: {}".format(ModelProfile[1]))
+                  self.__ModelProfileLinks.append(ModelProfile)
+    
     def __GetModelAlbumLinks(self):
-        for ModelProfileLink in self.__ModelProfileLinks:
-            #Get the model's profile HTML source  
-            ModelProfile = requests.get(ModelProfileLink[1])
-            ModelProfile = BeautifulSoup(ModelProfile.content, 'lxml')
+          with cf.ThreadPoolExecutor() as worker:
+            for Name, ModelProfileLink in self.__ModelProfileLinks:
+                  worker.submit(self.__GetModelAlbumLink, Name, ModelProfileLink)
+                
 
-            ULs = ModelProfile.find_all('ul', class_ = 'gallery-a b')
+    def __GetModelAlbumLink(self, Name, ModelProfileLink):
+          #Get the model's profile HTML source  
+          ModelProfile = requests.get(ModelProfileLink)
+          ModelProfile = BeautifulSoup(ModelProfile.content, 'lxml')
 
-            #From model's profile link, search for all the model's albums
-            for ul in ULs:
-                #Find model's album links
-                As = ul.find_all('a')
+          ULs = ModelProfile.find_all('ul', class_ = 'gallery-a b')
 
-                for a in As:
-                    ModelNameAndAlbumLink = []
+          #From model's profile link, search for all the model's albums
+          for ul in ULs:
+              #Find model's album links
+              As = ul.find_all('a')
 
-                    #Name of the model
-                    ModelNameAndAlbumLink.append(ModelProfileLink[0])
-                    #Model's album link
-                    ModelNameAndAlbumLink.append(a['href'])
+              for a in As:
+                  ModelNameAndAlbumLink = []
 
-                    print("Model Album Found!: {}".format(ModelNameAndAlbumLink[1]))
+                  #Name of the model
+                  ModelNameAndAlbumLink.append(Name)
+                  #Model's album link
+                  ModelNameAndAlbumLink.append(a['href'])
 
-                    self.ModelNameAndAlbumLinks.append(ModelNameAndAlbumLink)
+                  print("Model Album Found!: {}".format(ModelNameAndAlbumLink[1]))
+
+                  self.ModelNameAndAlbumLinks.append(ModelNameAndAlbumLink)
 
     @staticmethod
     def __GetImageTagsInImageHTML(ModelAlbumLink: str) -> Union[List[str], None]:
@@ -241,16 +301,19 @@ class GetRylskyModels():
             pass
 
     def ProcessLinksBeforeDownload(self):
+        start = time.time()
         print("Running...")
-        self.__GetHotModelPage()
+        self.__GetHotModelPages(self.RylskyHotModelMainPage)
+        
         self.__GetModelProfileLinks()
         print("\n\nFetching Model's Profile done!\n\n")
         self.__GetModelAlbumLinks()
         print("\n\nFetching Model's List of Albums done!\n\n")
         self.__WriteModelProfileLinkDB()
         print("\n\nWriting To ModelAlbumLink Done\n\n")
+        self.Timer(start)
 
 if __name__ == '__main__':
     Rylsky = GetRylskyModels()
-    Rylsky.ProcessLinksBeforeDownload()
-    # Rylsky.DownloadAllImages()
+    # Rylsky.ProcessLinksBeforeDownload()
+    Rylsky.DownloadAllImages()
