@@ -24,11 +24,14 @@
 #Information about rylsky hot models page
 ##########################################
 #In total the page has 90000+ links
+#It has 42025 folders
+#It is 31.1 GB in total
 #There are approximately 100+ pages in rylsky top models
 #There are 89 model profiles in rylsky top model page 1
 #One Model Profile contains approximately 10-100 albums
 #One Model Album contains approximately 10-20 pictures
-#In total, it downloads approximately 50 thousand pictures
+#In total, it downloads approximately 614 thousand pictures
+#It takes 9 hours 23 minutes to download all the files
 
 from bs4 import BeautifulSoup
 import requests
