@@ -1,9 +1,9 @@
 import aiohttp
 from bs4 import BeautifulSoup # type: ignore
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Union, Optional
 import asyncio
 from time import time
-import os
+import os #type: ignore
 
 #WARNING NSFW!
 class RylSkyImageLinkFinder:
@@ -23,7 +23,7 @@ class RylSkyImageLinkFinder:
         self.writeMode: str = WriteMode
 
     @staticmethod
-    async def __Fetch_Website_Source(ModelDict: Dict[str, str]) -> Dict[str, Optional[str]]:
+    async def __Fetch_Website_Source(ModelDict: Dict[str, str]) -> Dict[str, Union[str, bytes, None]]:
         """
         Fetch all the model album websites source from given model dictionary
         return value:
@@ -32,12 +32,13 @@ class RylSkyImageLinkFinder:
         """
         async with aiohttp.ClientSession() as session:
             async with session.get(ModelDict['link']) as response:
-                return dict([('source', await response.text()), ('name', ModelDict['name']), ('album', ModelDict.get('album'))])
+                return {'source': await response.read(), 'name': ModelDict['name'], 'album': ModelDict.get('album')}
+
 
     async def __Fetch_Websites_Source(self, ModelInfoAndLinks: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """
         Fetch all the model album website source from given model list dictionary
-        use background task to increase speed
+        use background concurrent task to increase speed
         """
         tasks = list(map(lambda link: asyncio.create_task(self.__Fetch_Website_Source(link)), ModelInfoAndLinks))
         return await asyncio.gather(*tasks)
@@ -124,7 +125,7 @@ class RylSkyImageLinkFinder:
         with open(self.album_file, mode=self.writeMode, encoding='UTF-8') as f:
             for pic_info in self.picture_pages:
                 try:
-                    f.write(f"{pic_info['name']};{pic_info['album']};{pic_info['link']}\n")
+                    f.write(f"{pic_info['name'].strip()};{pic_info['album'].strip()};{pic_info['link'].strip()}\n")
                 except UnicodeEncodeError:
                     pass
 
@@ -135,32 +136,64 @@ class RylSkyImageLinkFinder:
         """
         start = time()
         await self._GetMainPageSource()
-        print(f"Getting MainPage: {time() - start:.2f} second taken")
         await self._GetAllAlbumPageFromModelPage()
-        print(f"Getting AlbumsPage: {time() - start:.2f} second taken")
         await self.FindAllImagesInAlbum()
-        print(f"Getting AlbumPhotoLinksPage: {time() - start:.2f} second taken")
         self.WriteAlbumLinkToTxtFile()
-        print(f"Writing AlbumLinkToTxtFile: {time() - start:.2f} second taken")
+        print(f"Time Taken = {(time() - start):.2f} s", end='\r')
 
+class RylSkyImagesLinkFinder:
+    def __init__(self, AlbumTxtPath: str = 'ModelAlbumLinks.txt', page_size = 101):
+        self.start = time()
+        self.page_size = page_size
+        self.album_path = AlbumTxtPath
+
+    def first_time_web_read(self):
+        test_finder = RylSkyImageLinkFinder(WriteMode='w', AlbumTxtPath=self.album_path)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(test_finder.run())
+
+    def multiple_time_web_read(self, i):
+        try:
+            test_finder = RylSkyImageLinkFinder(TargetMainPage=i, WriteMode='a', AlbumTxtPath=self.album_path)
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(test_finder.run())
+        except Exception:
+            pass
+    def Run(self):
+        self.first_time_web_read()
+        print(f"{time() - self.start:.2f} second taken!")
+        for i in range(2, self.page_size):
+            start = time()
+            self.multiple_time_web_read(i)
+            print(f"Current cycle: {i}, One cycle: {time() - start:.2f} s,\
+                 Cumulative: {int(divmod(time() - self.start, 60)[0])} m {divmod(time() - self.start, 60)[1]:.2f} s", end='\r')
 
 class RylskyImageDownloader:
-    def __init__(self, AlbumTxtPath = 'ModelAlbumLinks.txt'):
+    def __init__(self, AlbumTxtPath = 'ModelAlbumLinks.txt', DefaultDownloadPath = None):
         self.index: int = 0
-        self.album_file: str = AlbumTxtPath
+        self.download_index: int = 0
+        self.target_filename: str = AlbumTxtPath
         self.album_links: List[Dict[str, str]] = []
         self.sources: List[Dict[str, str]] = []
         self.finished_download: bool = False
+        self.default_path: Optional[str] = DefaultDownloadPath
+        self.start = time()
 
     def _ReadTxtFile(self):
         """
         Read the file from self.album_file to get the album picture links
         then save the record in self.album_links
         """
-        with open(self.album_file, mode='r') as file:
-            model_name, album_name, link = file.readline().replace('\n', '').split(sep=',')
-            self.album_links.append({'name': model_name, 'album': album_name, 'link': link})
-
+        with open(self.target_filename, mode='r', encoding='UTF-8') as file:
+            while True:
+                try:
+                    r = file.readline()
+                    if r == '':
+                        break
+                    model_name, album_name, link = r.replace('\n', '').split(sep=';')
+                    self.album_links.append({'name': model_name, 'album': album_name, 'link': link})
+                except Exception as e:
+                    pass
         return self
 
     async def _DownloadSource(self, album_info: Dict[str, str]):
@@ -173,7 +206,9 @@ class RylskyImageDownloader:
         """
         async with aiohttp.ClientSession() as session:
             async with session.get(album_info['link']) as response:
-                return {'source': response.content, 'name': album_info['name'], 'album': album_info['album']}
+                return {'source': await response.content.read(),\
+                        'name': album_info['name'],\
+                        'album': album_info['album']}
 
     async def _DownloadMultipleSource(self, DownloadLimitPerTime: int = 20):
         """
@@ -184,14 +219,13 @@ class RylskyImageDownloader:
         """
         tasks: List[asyncio.Task] = []
         for _ in range(DownloadLimitPerTime):
-            if self.index >= len(self.album_links):
-                self.finished_download = True
-                break
-            tasks.append(asyncio.create_task(self._DownloadSource(self.album_links[self.index])))
-            self.index += 1
-
+            try:
+                tasks.append(asyncio.create_task(self._DownloadSource(self.album_links[self.download_index])))
+                self.download_index += 1
+            except Exception:
+                pass
+        
         self.sources.extend(await asyncio.gather(*tasks))
-
         return self
 
     @staticmethod
@@ -199,16 +233,22 @@ class RylskyImageDownloader:
         """
         Get downloaded source and convert it into jpg or png file        
         """
-        with open(ImagePath, 'w') as w:
+        with open(ImagePath, mode='wb') as w:
             w.write(Source)
 
     @staticmethod
-    def _CheckPathExistAndMakeFolder(ModelName: str, AlbumName: str) -> str:
+    def _CheckPathExistAndMakeFolder(ModelName: str, AlbumName: str, defaultPath= None) -> str:
         """
         Input model name and album name
-        Make folder path in "model_name/album_name/picture_path" way
+        if defaultPath is not None:
+            Make folder path in "defaultPath/model_name/album_name/picture_path" way
+        else:
+            Make folder path in "model_name/album_name/picture_path" way
         """
-        Path = os.path.join(ModelName, AlbumName)
+        if defaultPath is not type(None):
+            Path = os.path.join(defaultPath, ModelName, AlbumName)
+        else:
+            Path = os.path.join(ModelName, AlbumName)
         if os.path.exists(Path) is False:
             os.makedirs(Path)
         return Path
@@ -223,35 +263,28 @@ class RylskyImageDownloader:
         """
         self._ReadTxtFile()
         while self.finished_download is False:
-            print(f"Current Stage: {self.index} / {len(self.album_links)}... {self.index/ len(self.album_links) * 100:.2f} %")
-            await self._DownloadMultipleSource()
-            for index, source in enumerate(self.sources):
-                Folders_Location = self._CheckPathExistAndMakeFolder(source['name'], source['album'])
+            start_per_download = time()
+            await self._DownloadMultipleSource(DownloadLimitPerTime=50)
+            for source in self.sources:
+                Folders_Location = self._CheckPathExistAndMakeFolder(source['name'], source['album'], self.default_path)
                 ##########################################
                 #       PROBLEM:                         # 
                 #       Image naming problem             #
                 #       What to do?                      #
                 ##########################################
-                self._ConvertSourceToFile(source['source'], os.path.join(Folders_Location, str(index)+'.jpg'))
-            del self.sources
+                self._ConvertSourceToFile(source['source'], os.path.join(Folders_Location, str(self.index)+'.jpg'))
+                self.index += 1
+            self.sources.clear()
+            print(f"Current Stage: {self.index} / {len(self.album_links)}...\
+                 {self.index/ len(self.album_links) * 100:.2f} %\
+                 1 Cycle time taken: {time() - start_per_download:.2f} s\
+                Cumulative time taken: {int(divmod(time() - self.start, 60)[0])}m  {divmod(time() - self.start, 60)[1]:.2f}s", end='\r')
 ###############################################
 
 if __name__ == '__main__':
-    start = time()
-    test_finder = RylSkyImageLinkFinder(WriteMode='w')
+    # test_finder = RylSkyImagesLinkFinder()
+    # test_finder.Run()
+
+    test_downloader = RylskyImageDownloader(DefaultDownloadPath='RylskyImages')
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(test_finder.run())
-    print(f"{time() - start:.2f} second taken!")
-    for i in range(2, 101):
-        try:
-            print(f"{i} th page writing...")
-            test_finder = RylSkyImageLinkFinder(TargetMainPage=i, WriteMode='a')
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(test_finder.run())
-        except Exception:
-            print('UnicodeError: passing this stage')
-            pass
-    print(f"{time() - start:.2f} second taken!")
-    # test_downloader = RylskyImageDownloader()
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(test_downloader.Run())
+    loop.run_until_complete(test_downloader.Run())
