@@ -148,18 +148,31 @@ class RylSkyImagesLinkFinder:
         self.album_path = AlbumTxtPath
 
     def first_time_web_read(self):
+        """
+        For page 1
+        Mode set in write
+        """
         test_finder = RylSkyImageLinkFinder(WriteMode='w', AlbumTxtPath=self.album_path)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(test_finder.run())
 
     def multiple_time_web_read(self, i):
         try:
+            """
+            From Pages 2 - self.page size
+            Mode set in append
+            """
             test_finder = RylSkyImageLinkFinder(TargetMainPage=i, WriteMode='a', AlbumTxtPath=self.album_path)
             loop = asyncio.get_event_loop()
             loop.run_until_complete(test_finder.run())
         except Exception:
             pass
     def Run(self):
+        """
+        Main download function
+        by default, downloads 100 pages of rylsky models
+        which is approx 400000 image links
+        """
         self.first_time_web_read()
         print(f"{time() - self.start:.2f} second taken!")
         for i in range(2, self.page_size):
@@ -282,9 +295,11 @@ class RylskyImageDownloader:
 ###############################################
 
 if __name__ == '__main__':
+    #Album Links Finding
     # test_finder = RylSkyImagesLinkFinder()
     # test_finder.Run()
 
+    #From Album Links download images
     test_downloader = RylskyImageDownloader(DefaultDownloadPath='RylskyImages')
     loop = asyncio.get_event_loop()
     loop.run_until_complete(test_downloader.Run())
