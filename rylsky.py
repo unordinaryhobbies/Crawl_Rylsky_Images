@@ -1,322 +1,292 @@
-#Program informations
+import aiohttp
+from bs4 import BeautifulSoup # type: ignore
+from typing import List, Any, Dict, Union, Optional
+import asyncio
+from time import time
+import os #type: ignore
+from format.crawler_format import CrawlingNudeLinks
 
-#What this program does?
-##########################################
-#Get pictures of top rated rylsky model in page 1
+#WARNING NSFW!
+class RylSkyImageLinkFinder(CrawlingNudeLinks):
+    """
+    Rylsky images link finding and recording code
+    Take 15 - 60 second to get image paths.
+    """
+    def __init__(self, TargetMainPage: int = 1, WriteMode: str = 'w', AlbumTxtPath: str = 'ModelAlbumLinks.txt') -> None:
+        super().__init__()
+        #model websites links
+        self.model_webs: List[str] = []
+        self.main_page: str = "https://www.elitebabes.com/top-rated-babes/page/"
+        self.album_file: str = AlbumTxtPath
+        self.model_pages: List[Dict[str, str]] = []
+        self.model_albums: List[Dict[str, Any]] = []
+        self.picture_pages: List[Dict[str, str]] = []
+        self.main_page_num: int = TargetMainPage
+        self.writeMode: str = WriteMode
 
-#Algorithm
-##########################################
-#Get Models profile link -> Get List of model's album links-> Get Album's picture links-> Download the picture's link
+    async def __Fetch_Websites_Source(self, ModelInfoAndLinks: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        Fetch all the model album website source from given model list dictionary
+        use background concurrent task to increase speed
+        """
+        async def Fetch_Website_Source(ModelDict: Dict[str, str]) -> Dict[str, Union[str, bytes, None]]:
+            """
+            Fetch all the model album websites source from given model dictionary
+            return value:
+                1st: website source
+                2nd: model name
+            """
+            async with aiohttp.ClientSession() as session:
+                async with session.get(ModelDict['link']) as response:
+                    return {'source': await response.read(), 'name': ModelDict['name'], 'album': ModelDict.get('album')}
 
-#How to Run?
-##########################################
-#1.Initialise Constructor
-#2.Run Rylsky.ProcessLinksBeforeDownload() to get all the model's album links. (This process take approximately 17 - 21 minutes)
-#3.After getting all the model album links, Run Rylsky.DownloadAllImages() to download all images
 
-#How it produces a folder
-##########################################
-#When it starts to download the image, 
-#At the top, it will produce a folder called "RylskyTopModels"
-#then it will produce folders according to the model's name
-#Each model folder contains their albums and have photos in it
+        tasks = list(map(lambda link: asyncio.create_task(Fetch_Website_Source(link)), ModelInfoAndLinks))
+        return await asyncio.gather(*tasks)
 
-#Information about rylsky hot models page
-##########################################
-#In total the page has 90000+ links
-#It has 42025 folders
-#It is 31.1 GB in total
-#There are approximately 100+ pages in rylsky top models
-#There are 89 model profiles in rylsky top model page 1
-#One Model Profile contains approximately 10-100 albums
-#One Model Album contains approximately 10-20 pictures
-#In total, it downloads approximately 614 thousand pictures
-#It takes 9 hours 23 minutes to download all the files
+    async def _GetMainPageSource(self) -> None:
+        """
+        Go to
+        https://www.elitebabes.com/top-rated-babes/
+        And fetch models link
 
-from bs4 import BeautifulSoup
-import requests
-import os
-import pdb
-import concurrent.futures as cf
-import sys
-import time
-from typing import List, Union, Callable
+        1.Convert it into bs4 object
+        2.Get ul element -> list for model html paths
+        3.Extract all 'a href' & 'img alt'
+        4.Record it in self.model_pages list
+        """
 
-class GetRylskyModels():
-    def __init__(self, ModelProfileLinkDatabase="ModelAlbumLinks.txt"):
-        self.RylskyHotModelMainPage = "https://www.elitebabes.com/top-rated-babes/"
-        self.__ModelProfileLinks: List[str] = []
-        self.ModelNameAndAlbumLinks: List[str] = []
-        self.__ModelProfileLinkDatabase = ModelProfileLinkDatabase
-        self.__HotModelPages: List[str] = ["https://www.elitebabes.com/top-rated-babes/"]
-    
-    def __GetHotModelPages(self, NextPage: str, MaxPageLimit = 50):
-        
-        #If it reached more than the max limit, exit
-        if str(MaxPageLimit) in NextPage:
-              return None
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.main_page + str(self.main_page_num)) as main_web:
+                website_source = BeautifulSoup(await main_web.text(), 'lxml')
+                model_ul = website_source.find('ul', class_='gallery-a a d')
+                model_li = model_ul.find_all('a')
+                self.model_pages.extend(list(map(lambda a: {'link': a['href'], 'name': a.find('img')['alt']}, model_li)))
 
-        #Get next page
-        HotModelPage = requests.get(NextPage)
-        HotModelPage = BeautifulSoup(HotModelPage.content, 'lxml')
+    async def _GetAllAlbumPageFromModelPage(self) -> None:
+        """
+        Go to all the models page saved in self.model_pages then
+        fetch model's album link
+        model link ex: 'https://www.elitebabes.com/model/alisa-i/'
 
-        Nav_HotModelPage = HotModelPage.find('nav', class_='pagination-a')
+        1.Convert it into bs4 object
+        2.Get ul element -> list for model html paths
+        3.Extract all 'a href' path
+        4.Record it in self.model_albums list
+        """
 
-        Li_NextPage = Nav_HotModelPage.find('li', class_='next')
-        
-        #Repeat until there are no next pages
-        if Li_NextPage is not None:
-          NextHotModelPageLink = Li_NextPage.find('a')['href']
-          print("Found : {}".format(NextHotModelPageLink))
+        model_web = await self.__Fetch_Websites_Source(self.model_pages)
 
-          self.__HotModelPages.append(NextHotModelPageLink)
+        """
+        Process the raw html files
+        1. find ul element to extract the model albums
+        2. find all <a href> element to get the redirect links 
+        """
+        for model in model_web:
+            website_source = BeautifulSoup(model['source'], 'lxml')
+            album_ul = website_source.find('ul', class_='gallery-a b')
+            album_li = album_ul.find_all('li')
+            self.model_albums.extend(list(map(\
+                lambda link: dict([('link', link.find('a')['href']), ('name', model['name']), ('album', link.find('img')['alt'])]),\
+                     album_li)))
 
-          return self.__GetHotModelPages(NextHotModelPageLink)
-        
-        return None
+    async def FindAllImagesInAlbum(self) -> None:
+        """
+        Inside self.model_albums, there are all the links to the model albums
+        Now we are going to go inside to all the album links then get all the <a href> for the image
+        Album Link Example: https://www.elitebabes.com/sweet-and-charming-stuns-us-with-her-sexy-legs-and-shaved-pussy-17116/
+        """
+        album_web = await self.__Fetch_Websites_Source(self.model_albums)
+        """
+        Process the raw html files
+        1. find ul element to extract the model albums
+        2. find all <a href> image elements 
+        """
+        for album in album_web:
+            website_source = BeautifulSoup(album['source'], 'lxml')
+            album_ul = website_source.find('ul', class_='list-gallery a css')
+            try:
+                album_li = album_ul.find_all('a')
+                self.picture_pages.extend(list(map(lambda web: {'name': album['name'], 'link': web['href'], 'album': album['album']}, album_li)))
+            except AttributeError:
+                pass
 
-    #Get model's profile links to get model's album links
-    def __GetModelProfileLinks(self):
-          
-        for HotModelPage in self.__HotModelPages:
-          #Get Request From Each Page
-          HotModelPage = requests.get(HotModelPage)
-          HotModelPage = BeautifulSoup(HotModelPage.content, 'lxml')
-          #Call unordered list that stores the model's profile
-          ULs = HotModelPage.find_all('ul', class_='gallery-a a d')
+    def WriteAlbumLinkToTxtFile(self) -> None:
+        """
+        Write the album image links(which is in the self.picture_pages list) to the given txt file
+        Writing procedure:
+            Delimiter: ;
+            1. name of the model
+            2. name of the album
+            3. picture link
+        """
+        with open(self.album_file, mode=self.writeMode, encoding='UTF-8') as f:
+            for pic_info in self.picture_pages:
+                try:
+                    f.write(f"{pic_info['name'].strip()};{pic_info['album'].strip()};{pic_info['link'].strip()}\n")
+                except UnicodeEncodeError:
+                    pass
 
-          ModelProfileLink = []
+class RylSkyImagesLinkFinder:
+    def __init__(self, AlbumTxtPath: str = 'ModelAlbumLinks.txt', page_size = 101):
+        self.start = time()
+        self.page_size = page_size
+        self.album_path = AlbumTxtPath
 
-          #Store model's name and profile link in list
-          for ul in ULs:
-            #Find model's link by finding a href link
-            As = ul.find_all('a')
+    def first_time_web_read(self):
+        """
+        For page 1
+        Mode set in write
+        """
+        test_finder = RylSkyImageLinkFinder(WriteMode='w', AlbumTxtPath=self.album_path)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(test_finder.run())
 
-            with cf.ThreadPoolExecutor() as worker:
-              for a in As:
-                  #Get the <span> which contains the name of the model
-                  name = a.find_all('span')[-1].text
-                  print("\nTarget: Model name found! : {}".format(name))
-
-                  ModelProfileLink = [name, a['href']]
-                  worker.submit(self.FindAdditionalModelProfileLinks, ModelProfileLink)
-
-    def FindAdditionalModelProfileLinks(self, ModelProfileLink):
-        self.__ModelProfileLinks.append(ModelProfileLink)
-
-        #Check if model profile's additional pages exist and append them
-        self.__CheckAdditionalPagesInModelProfileExist(ModelProfileLink)
-    
-    def __ReadModelProfileLinkDB(self):
-        self.ModelNameAndAlbumLinks = []
-        with open(self.__ModelProfileLinkDatabase, 'r') as Read:
-            for read in Read:
-                info = Read.readline().split(',')
-
-                self.ModelNameAndAlbumLinks.append(info)
-
-    def __WriteModelProfileLinkDB(self):
-        self.__ModelProfileLinks.sort(key=lambda ModelProfileLink: ModelProfileLink[0],reverse=True)
-        with open(self.__ModelProfileLinkDatabase,'a') as Write:
-            for redirect in self.ModelNameAndAlbumLinks:
-                Write.write("{},{}\n".format(redirect[0], redirect[1]))
-
-    def __CheckAdditionalPagesInModelProfileExist(self, ModelProfileLink):
-          Name, ProfileLink = ModelProfileLink
-
-          #Get model's profile's HTML
-          ModelProfile = requests.get(ProfileLink)
-          ModelProfile = BeautifulSoup(ModelProfile.content, "lxml")
-          
-          #Find if additional pages exist
-          AdditionalPages = ModelProfile.find("div", class_="m-pagination")
-
-          #If there are no additional pages, exit
-          if AdditionalPages is None:
-                print("No additional pages found")
-                return
-          #Otherwise, find "a" element
-          AdditionalPagesSource = AdditionalPages.find_all('a')
-
-          for ModelProfileLink in AdditionalPagesSource:
-                #Check if the link is relevent to models
-                if ModelProfileLink['href'].startswith('https://www.elitebabes.com/model') and 'mpage' in ModelProfileLink['href']:
-                  ModelProfile = [Name, ModelProfileLink['href']]
-                  print("Model Profile links Found!: {}".format(ModelProfile[1]))
-                  self.__ModelProfileLinks.append(ModelProfile)
-    
-    def __GetModelAlbumLinks(self):
-          with cf.ThreadPoolExecutor() as worker:
-            for Name, ModelProfileLink in self.__ModelProfileLinks:
-                  worker.submit(self.__GetModelAlbumLink, Name, ModelProfileLink)
-                
-
-    def __GetModelAlbumLink(self, Name, ModelProfileLink):
-          #Get the model's profile HTML source  
-          ModelProfile = requests.get(ModelProfileLink)
-          ModelProfile = BeautifulSoup(ModelProfile.content, 'lxml')
-
-          ULs = ModelProfile.find_all('ul', class_ = 'gallery-a b')
-
-          #From model's profile link, search for all the model's albums
-          for ul in ULs:
-              #Find model's album links
-              As = ul.find_all('a')
-
-              for a in As:
-                  ModelNameAndAlbumLink = []
-
-                  #Name of the model
-                  ModelNameAndAlbumLink.append(Name)
-                  #Model's album link
-                  ModelNameAndAlbumLink.append(a['href'])
-
-                  print("Model Album Found!: {}".format(ModelNameAndAlbumLink[1]))
-
-                  self.ModelNameAndAlbumLinks.append(ModelNameAndAlbumLink)
-
-    @staticmethod
-    def __GetImageTagsInImageHTML(ModelAlbumLink: str) -> Union[List[str], None]:
-        AlbumImgTags: List[str] = []
-        
-        #Calling Model's Album Link
-        ModelAlbumLink = requests.get(ModelAlbumLink,timeout=5)
-        content = BeautifulSoup(ModelAlbumLink.content, 'lxml')
-
-        ul = content.find('ul', class_='list-gallery a css')
-
-        #Find all image tags
+    def multiple_time_web_read(self, i):
         try:
-            ModelAlbumImageTags = ul.find_all('img')
-        #If none of the img tags are found, return nothing
+            """
+            From Pages 2 - self.page size
+            Mode set in append
+            """
+            test_finder = RylSkyImageLinkFinder(TargetMainPage=i, WriteMode='a', AlbumTxtPath=self.album_path)
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(test_finder.run())
         except Exception:
-            return None
-
-        #Append all the image tags and return the list of <img> tags
-        for ModelAlbumImageTag in ModelAlbumImageTags:
-            AlbumImgTags.append(ModelAlbumImageTag)
-        return AlbumImgTags
-
-    def __GetImage(self, ImgLinks, directory: str):
-      try:
-        for i , img in enumerate(ImgLinks):
-              
-            #Replace blank space in title with '_'
-            path = img['alt'].replace(' ','_')
-
-            #Get the image file link
-            RawImg = requests.get(img['src'], timeout=5)
-
-            #Check if dir exist before copying image to the directory
-            if os.path.isdir("{0}/{1}/{2}".format('RylskyTopModels',directory,path)) is False:
-                os.mkdir("{0}/{1}/{2}".format('RylskyTopModels',directory,path))
-
-            print("Downloading {:>90}: {:>15}th image".format(path, i))
-
-            self.__WriteImage(path="{0}/{1}/{2}/{3}.jpg".format('RylskyTopModels',directory, path , path+str(i)), RawImage=RawImg)
-      except Exception:
-        pass
-    
-    #Write data to the image.
-    @staticmethod
-    def __WriteImage(path: str, RawImage):
-          file = open(path, "wb")
-          file.write(RawImage.content)
-          file.close()
-
-    def __DownloadImages(self,start=0):
-      length = len(self.ModelNameAndAlbumLinks)
-      i = 0
-      try:
-        #Call multi thread to process faster
-        with cf.ThreadPoolExecutor() as worker:
-          for i in range(start, length):
-              worker.submit(self.__DownloadImage, i)
-
-      except KeyboardInterrupt:
-        sys.exit()
-
-      except Exception:
-        self.__DownloadImages(i)
-                      
-    def __DownloadImage(self, index: int):
-          redirect = self.ModelNameAndAlbumLinks[index]
-          Tags = self.__GetImageTagsInImageHTML(redirect[1])
-
-          #Model's name
-          name = redirect[0]
-
-          #Check if dir exist before writing getting model's RylskyTopModels
-          if os.path.isdir("RylskyTopModels/{}".format(name)) is False:
-                os.mkdir("RylskyTopModels/{}".format(name))
-
-          #Call images from the website
-          self.__GetImage(Tags, name)
-
-          #Record the last section so that if the network fails, it will remember it's last reading
-          #Potential problem collision with recording
-          # self.__RecordLastSection(str(index))
-
-    #Record lsat section of writing image
-    @staticmethod
-    def __RecordLastSection(lastsection: str):
-      file = open('lastsection.txt','w')
-      file.write(lastsection)
-      file.close()
-    #Read last section of writing image
-    @staticmethod
-    def __ReadLastSection() -> Union[int, None]:
-      try:
-        with open("lastsection.txt",'r') as r:
-          last: int = int(r.readline())
-
-        #If value found, return the last recorded value
-        return last
-
-      except FileNotFoundError:
-        return None
-
-    #Used to calculate total time taken to download all file
-    @staticmethod
-    def Timer(startedTime):
-          time_elapsed = time.time() - startedTime
-          
-          hours, min_sec = divmod(time_elapsed, 3600)
-          minutes, seconds = divmod(min_sec, 60)
-          print("{:>3} hour {:>3} minute {:>3} second".format(int(hours), int(minutes), int(seconds)))
-
-    def DownloadAllImages(self):
-          start = time.time()
-          try:
-            self.__ReadModelProfileLinkDB()
-            if os.path.isdir('RylskyTopModels') is False:
-                os.mkdir('RylskyTopModels')
-            lastRead = self.__ReadLastSection()
-            if lastRead is not None:
-              self.__DownloadImages(lastRead)
-            else:
-              self.__DownloadImages()
-
-            #Print time elapsed
-            self.Timer(start)
-            
-          except KeyboardInterrupt:
             pass
+    def run(self):
+        """
+        Main download function
+        by default, downloads 100 pages of rylsky models
+        which is approx 400000 image links
+        """
+        self.first_time_web_read()
+        for i in range(2, self.page_size):
+            start = time()
+            self.multiple_time_web_read(i)
+            print(f"Current cycle: {i}, One cycle: {time() - start:.2f} s,\
+                 Cumulative: {int(divmod(time() - self.start, 60)[0])} m {divmod(time() - self.start, 60)[1]:.2f} s", end='\r')
 
-    def ProcessLinksBeforeDownload(self):
-        start = time.time()
-        print("Running...")
-        self.__GetHotModelPages(self.RylskyHotModelMainPage)
+class RylskyImageDownloader:
+    def __init__(self, AlbumTxtPath: str = 'ModelAlbumLinks.txt', InOneFile: bool = True, DefaultDownloadPath: Optional[str] = None):
+        self.index: int = 0
+        self.download_index: int = 0
+        self.target_filename: str = AlbumTxtPath
+        self.album_links: List[Dict[str, str]] = []
+        self.sources: List[Dict[str, str]] = []
+        self.finished_download: bool = False
+        self.default_path: Optional[str] = DefaultDownloadPath
+        self.MakeMultipleDirectory: bool = InOneFile
+        self.start = time()
+
+    def _ReadTxtFile(self):
+        """
+        Read the file from self.album_file to get the album picture links
+        then save the record in self.album_links
+        """
+        with open(self.target_filename, mode='r', encoding='UTF-8') as file:
+            while True:
+                try:
+                    r = file.readline()
+                    if r == '':
+                        break
+                    model_name, album_name, link = r.replace('\n', '').split(sep=';')
+                    self.album_links.append({'name': model_name, 'album': album_name, 'link': link})
+                except Exception:
+                    pass
+        return self
+
+    async def _DownloadSource(self, album_info: Dict[str, str]):
+        """
+        Download the image and pack it into dictionary formats
+        return value:
+            dictionary -> source: image source,
+                            album: name of the album
+                            name: name of the model
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.get(album_info['link']) as response:
+                return {'source': await response.content.read(),\
+                        'name': album_info['name'],\
+                        'album': album_info['album']}
+
+    async def _DownloadMultipleSource(self, DownloadLimitPerTime: int = 20):
+        """
+        1. Check if Download limit exceed
+        2. Download source in background to increase efficiency
+        3. Everytime when source is downloaded, increase self.index by 1
+        4. Add the image sources to the self.sources
+        """
+        tasks: List[asyncio.Task] = []
+        for _ in range(DownloadLimitPerTime):
+            try:
+                tasks.append(asyncio.create_task(self._DownloadSource(self.album_links[self.download_index])))
+                self.download_index += 1
+            except Exception:
+                pass
         
-        self.__GetModelProfileLinks()
-        print("\n\nFetching Model's Profile done!\n\n")
-        self.__GetModelAlbumLinks()
-        print("\n\nFetching Model's List of Albums done!\n\n")
-        self.__WriteModelProfileLinkDB()
-        print("\n\nWriting To ModelAlbumLink Done\n\n")
-        self.Timer(start)
+        self.sources.extend(await asyncio.gather(*tasks))
+        return self
+
+    @staticmethod
+    def _ConvertSourceToFile(Source: Any, ImagePath: str) -> None:
+        """
+        Get downloaded source and convert it into jpg or png file        
+        """
+        with open(ImagePath, mode='wb') as w:
+            w.write(Source)
+
+    def _CheckPathExistAndMakeFolder(self, ModelName: str, AlbumName: str, defaultPath= None) -> str:
+        """
+        Input model name and album name
+        if defaultPath is not None:
+            Make folder path in "defaultPath/model_name/album_name/picture_path" way
+        else:
+            Make folder path in "model_name/album_name/picture_path" way
+        """
+        if defaultPath is not type(None) and self.MakeMultipleDirectory is False:
+            Path = os.path.join(defaultPath)
+        elif defaultPath is not type(None):
+            Path = os.path.join(defaultPath, ModelName, AlbumName)
+        else:
+            Path = os.path.join(ModelName, AlbumName)
+        if os.path.exists(Path) is False:
+            os.makedirs(Path)
+        return Path
+
+############################################
+    async def Run(self):
+        """
+        Procedure:
+            1. ReadTxtFile
+            2. Check if folder exist if not make a new folder
+            2. Repeat downloading and injecting source to the images
+        """
+        self._ReadTxtFile()
+        while self.finished_download is False:
+            start_per_download = time()
+            await self._DownloadMultipleSource(DownloadLimitPerTime=50)
+            for source in self.sources:
+                Folders_Location = self._CheckPathExistAndMakeFolder(source['name'], source['album'], self.default_path)
+                ##########################################
+                #       PROBLEM:                         # 
+                #       Image naming problem             #
+                #       What to do?                      #
+                ##########################################
+                self._ConvertSourceToFile(source['source'], os.path.join(Folders_Location, str(self.index)+'.jpg'))
+                self.index += 1
+            self.sources.clear()
+            print(f"Current Stage: {self.index} / {len(self.album_links)}...\
+                 {self.index/ len(self.album_links) * 100:.2f} %\
+                 1 Cycle time taken: {time() - start_per_download:.2f} s\
+                Cumulative time taken: {int(divmod(time() - self.start, 60)[0])}m  {divmod(time() - self.start, 60)[1]:.2f}s", end='\r')
+###############################################
 
 if __name__ == '__main__':
-    Rylsky = GetRylskyModels()
-    # Rylsky.ProcessLinksBeforeDownload()
-    Rylsky.DownloadAllImages()
+    #Album Links Finding
+    test_finder = RylSkyImagesLinkFinder()
+    test_finder.run()
+
+    #From Album Links download images
+    # test_downloader = RylskyImageDownloader(DefaultDownloadPath='RylskyImages', InOneFile=False)
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(test_downloader.Run())

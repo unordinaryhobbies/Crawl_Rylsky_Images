@@ -1,1 +1,0 @@
-worker: python rylsky2.py
