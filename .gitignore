@@ -1,7 +1,4 @@
-*
-
-!rylksy.py
-!README.md
-!rylsky_rewrite.py
-!data_analysis.ipynb
-!format
+/RylskyImages
+/__pycache__
+/.mypy_cache
+/.ipynb_checkpoints
